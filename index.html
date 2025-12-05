@@ -143,6 +143,9 @@
                     canvasElement.width = videoWidth;
                     canvasElement.height = videoHeight;
 
+                    // FIX: Explicitly call play() to ensure video playback starts
+                    videoElement.play();
+
                     isRunning = true;
                     drawVideoToCanvas();
                     updateStatus('Webcam feed is live on the canvas!', 'success');
