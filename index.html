@@ -7,7 +7,7 @@
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles for better centering and modern appearance */
+        /* CSS Styles */
         :root {
             --primary-color: #3b82f6; /* Tailwind blue-500 */
         }
@@ -52,7 +52,7 @@
     </div>
 
     <script>
-        // Set up references to the elements
+        // JavaScript Logic
         const startButton = document.getElementById('startButton');
         const videoElement = document.getElementById('webcamVideo');
         const canvasElement = document.getElementById('videoCanvas');
@@ -61,12 +61,12 @@
         const errorMessage = document.getElementById('errorMessage');
 
         let stream = null;
-        let isRunning = false; // State tracker for the webcam stream
+        let isRunning = false; 
 
         // Function to update the status message box
         function updateStatus(message, type = 'info') {
             statusMessage.textContent = message;
-            statusMessage.className = 'p-3 rounded-lg font-medium mb-6 transition-all duration-300'; // Reset classes
+            statusMessage.className = 'p-3 rounded-lg font-medium mb-6 transition-all duration-300';
             
             if (type === 'error') {
                 statusMessage.classList.add('bg-red-100', 'text-red-700');
@@ -80,7 +80,6 @@
         // Function to stop the webcam stream gracefully
         function stopWebcam() {
             if (stream) {
-                // Stop all tracks (video, audio) to release the camera hardware
                 stream.getTracks().forEach(track => track.stop());
                 videoElement.srcObject = null;
                 stream = null;
@@ -90,19 +89,15 @@
             startButton.disabled = false;
             updateStatus("Webcam feed stopped. Click 'Start Webcam Feed' to resume.", 'info');
 
-            // Clear the canvas visually
             canvasContext.clearRect(0, 0, canvasElement.width, canvasElement.height);
         }
 
         // 3. Drawing the video frame onto the canvas
         function drawVideoToCanvas() {
-            // Only draw if the video element has data (i.e., the stream is running)
             if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-                // Draw the current video frame onto the canvas
                 canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
             }
             
-            // Request the next frame for continuous drawing only if the stream is running
             if (isRunning) {
                 requestAnimationFrame(drawVideoToCanvas);
             }
@@ -110,7 +105,6 @@
 
         // 2. Setting up the video stream
         async function startWebcam() {
-            // Implement toggle behavior
             if (isRunning) {
                 stopWebcam();
                 return;
@@ -119,7 +113,6 @@
             updateStatus('Requesting camera access...');
             startButton.disabled = true;
 
-            // FIX: Check if the required API is available.
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 const browserError = "Webcam access failed: The browser or current environment (non-HTTPS) does not support the necessary MediaDevices API.";
                 console.error("MediaDevices API missing or restricted:", browserError);
@@ -131,24 +124,19 @@
             }
 
             try {
-                // MOBILE ENHANCEMENT: Use facingMode constraint for better camera selection
                 const constraints = {
                     video: {
-                        facingMode: 'environment' // Suggests the rear camera for mobile
+                        facingMode: 'environment'
                     }, 
                     audio: false
                 };
                 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
-                // Set the video source to the stream
                 videoElement.srcObject = stream;
                 
-                // IMPORTANT FIX: Use 'oncanplay' instead of 'onloadedmetadata'.
-                // 'oncanplay' guarantees that the video element has buffered enough data
-                // to start playing, ensuring dimensions are correct and data is available to draw.
+                // Use 'oncanplay' to reliably start drawing
                 videoElement.oncanplay = () => {
-                    // Set canvas dimensions to match the video feed resolution for correct aspect ratio
                     const videoWidth = videoElement.videoWidth;
                     const videoHeight = videoElement.videoHeight;
                     
@@ -156,18 +144,15 @@
                     canvasElement.height = videoHeight;
 
                     isRunning = true;
-                    // Start the continuous drawing loop
                     drawVideoToCanvas();
                     updateStatus('Webcam feed is live on the canvas!', 'success');
                     startButton.textContent = 'Stop Webcam Feed';
                     startButton.disabled = false;
                     
-                    // Remove the handler after it fires once
                     videoElement.oncanplay = null; 
                 };
 
             } catch (error) {
-                // Handle permission denial or hardware issues
                 console.error("Error accessing webcam:", error);
                 const userFriendlyError = "Failed to access webcam. Please check permissions or if another application is using the camera.";
                 updateStatus(userFriendlyError, 'error');
