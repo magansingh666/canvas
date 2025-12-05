@@ -119,9 +119,19 @@
             updateStatus('Requesting camera access...');
             startButton.disabled = true;
 
+            // FIX: Check if the required API is available.
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                const browserError = "Webcam access failed: The browser or current environment (non-HTTPS) does not support the necessary MediaDevices API.";
+                console.error("MediaDevices API missing or restricted:", browserError);
+                updateStatus(browserError, 'error');
+                startButton.disabled = false;
+                startButton.textContent = 'Start Webcam Feed';
+                isRunning = false;
+                return; 
+            }
+
             try {
                 // MOBILE ENHANCEMENT: Use facingMode constraint for better camera selection
-                // 'environment' usually selects the rear camera on mobile devices.
                 const constraints = {
                     video: {
                         facingMode: 'environment' // Suggests the rear camera for mobile
@@ -133,9 +143,11 @@
                 
                 // Set the video source to the stream
                 videoElement.srcObject = stream;
-
-                // When the video stream loads metadata, set the canvas dimensions to match
-                videoElement.onloadedmetadata = () => {
+                
+                // IMPORTANT FIX: Use 'oncanplay' instead of 'onloadedmetadata'.
+                // 'oncanplay' guarantees that the video element has buffered enough data
+                // to start playing, ensuring dimensions are correct and data is available to draw.
+                videoElement.oncanplay = () => {
                     // Set canvas dimensions to match the video feed resolution for correct aspect ratio
                     const videoWidth = videoElement.videoWidth;
                     const videoHeight = videoElement.videoHeight;
@@ -149,13 +161,16 @@
                     updateStatus('Webcam feed is live on the canvas!', 'success');
                     startButton.textContent = 'Stop Webcam Feed';
                     startButton.disabled = false;
+                    
+                    // Remove the handler after it fires once
+                    videoElement.oncanplay = null; 
                 };
 
             } catch (error) {
                 // Handle permission denial or hardware issues
                 console.error("Error accessing webcam:", error);
                 const userFriendlyError = "Failed to access webcam. Please check permissions or if another application is using the camera.";
-                updateStatus(userFriendlyError + error, 'error');
+                updateStatus(userFriendlyError, 'error');
                 startButton.disabled = false;
                 startButton.textContent = 'Start Webcam Feed';
                 isRunning = false;
