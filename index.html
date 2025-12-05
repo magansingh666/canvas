@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Webcam to Canvas</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better centering and modern appearance */
+        :root {
+            --primary-color: #3b82f6; /* Tailwind blue-500 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Gray-100 */
+        }
+        /* Make the canvas responsive and fit its container */
+        #videoCanvas {
+            max-width: 100%;
+            height: auto;
+            border: 4px solid var(--primary-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl shadow-2xl text-center">
+        <h1 class="3xl font-extrabold text-gray-800 mb-2">Canvas Webcam Viewer</h1>
+        <p class="text-gray-500 mb-6">Captures live video feed and renders it onto a canvas element.</p>
+
+        <!-- Status Message Box -->
+        <div id="statusMessage" class="bg-blue-100 text-blue-700 p-3 rounded-lg font-medium mb-6 transition-all duration-300">
+            Click 'Start Webcam Feed' to begin.
+        </div>
+        
+        <!-- The Canvas element where the video will be drawn -->
+        <canvas id="videoCanvas" class="rounded-lg mb-6 mx-auto bg-gray-900"></canvas>
+
+        <!-- The Video element is hidden, it's just the source for the stream -->
+        <video id="webcamVideo" autoplay muted class="hidden"></video>
+
+        <!-- Control Button -->
+        <button id="startButton" class="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300">
+            Start Webcam Feed
+        </button>
+
+        <!-- Error Message Display -->
+        <div id="errorMessage" class="mt-4 text-red-600 font-semibold hidden"></div>
+
+    </div>
+
+    <script>
+        // Set up references to the elements
+        const startButton = document.getElementById('startButton');
+        const videoElement = document.getElementById('webcamVideo');
+        const canvasElement = document.getElementById('videoCanvas');
+        const canvasContext = canvasElement.getContext('2d');
+        const statusMessage = document.getElementById('statusMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let stream = null;
+        let isRunning = false; // State tracker for the webcam stream
+
+        // Function to update the status message box
+        function updateStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = 'p-3 rounded-lg font-medium mb-6 transition-all duration-300'; // Reset classes
+            
+            if (type === 'error') {
+                statusMessage.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                statusMessage.classList.add('bg-green-100', 'text-green-700');
+            } else { // info
+                statusMessage.classList.add('bg-blue-100', 'text-blue-700');
+            }
+        }
+
+        // Function to stop the webcam stream gracefully
+        function stopWebcam() {
+            if (stream) {
+                // Stop all tracks (video, audio) to release the camera hardware
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                stream = null;
+            }
+            isRunning = false;
+            startButton.textContent = 'Start Webcam Feed';
+            startButton.disabled = false;
+            updateStatus("Webcam feed stopped. Click 'Start Webcam Feed' to resume.", 'info');
+
+            // Clear the canvas visually
+            canvasContext.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        }
+
+        // 3. Drawing the video frame onto the canvas
+        function drawVideoToCanvas() {
+            // Only draw if the video element has data (i.e., the stream is running)
+            if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                // Draw the current video frame onto the canvas
+                canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            }
+            
+            // Request the next frame for continuous drawing only if the stream is running
+            if (isRunning) {
+                requestAnimationFrame(drawVideoToCanvas);
+            }
+        }
+
+        // 2. Setting up the video stream
+        async function startWebcam() {
+            // Implement toggle behavior
+            if (isRunning) {
+                stopWebcam();
+                return;
+            }
+            
+            updateStatus('Requesting camera access...');
+            startButton.disabled = true;
+
+            try {
+                // MOBILE ENHANCEMENT: Use facingMode constraint for better camera selection
+                // 'environment' usually selects the rear camera on mobile devices.
+                const constraints = {
+                    video: {
+                        facingMode: 'environment' // Suggests the rear camera for mobile
+                    }, 
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Set the video source to the stream
+                videoElement.srcObject = stream;
+
+                // When the video stream loads metadata, set the canvas dimensions to match
+                videoElement.onloadedmetadata = () => {
+                    // Set canvas dimensions to match the video feed resolution for correct aspect ratio
+                    const videoWidth = videoElement.videoWidth;
+                    const videoHeight = videoElement.videoHeight;
+                    
+                    canvasElement.width = videoWidth;
+                    canvasElement.height = videoHeight;
+
+                    isRunning = true;
+                    // Start the continuous drawing loop
+                    drawVideoToCanvas();
+                    updateStatus('Webcam feed is live on the canvas!', 'success');
+                    startButton.textContent = 'Stop Webcam Feed';
+                    startButton.disabled = false;
+                };
+
+            } catch (error) {
+                // Handle permission denial or hardware issues
+                console.error("Error accessing webcam:", error);
+                const userFriendlyError = "Failed to access webcam. Please check permissions or if another application is using the camera.";
+                updateStatus(userFriendlyError + error, 'error');
+                startButton.disabled = false;
+                startButton.textContent = 'Start Webcam Feed';
+                isRunning = false;
+            }
+        }
+
+        // 1. Attach the click handler to the button to toggle the stream
+        startButton.addEventListener('click', startWebcam);
+        
+        // Cleanup: Stop the stream when the user closes the window/tab
+        window.addEventListener('beforeunload', stopWebcam);
+    </script>
+</body>
+</html>
